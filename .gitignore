@@ -39,3 +39,8 @@ dist-ssr/
 *.njsproj
 *.sln
 *.sw?
+
+# Skill/prompt files (not needed in production)
+*.md
+!README.md
+
