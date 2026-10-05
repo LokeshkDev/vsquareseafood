@@ -1,8 +1,19 @@
-const API_BASE_URL = '/api/v1';
+// Environment-driven backend connection from client/.env ONLY
+const rawApiUrl = import.meta.env.VITE_API_URL;
+export const API_BASE_URL = rawApiUrl
+  ? rawApiUrl.replace(/\/+$/, '')
+  : '/api/v1';
+
+export const BACKEND_URL = (
+  import.meta.env.VITE_BACKEND_URL ||
+  (API_BASE_URL.startsWith('http') ? API_BASE_URL.replace(/\/api\/v1\/?$/, '') : '') ||
+  'http://localhost:5000'
+).replace(/\/+$/, '');
 
 class ApiClient {
   async request(endpoint, options = {}) {
-    const url = `${API_BASE_URL}${endpoint}`;
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${cleanEndpoint}`;
 
     const headers = {
       'Content-Type': 'application/json',

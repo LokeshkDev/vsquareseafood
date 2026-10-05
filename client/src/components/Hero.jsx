@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, UtensilsCrossed, CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
+import { api } from '../services/api.js';
 import bannerImg1 from '../assets/web-banner.png';
 import bannerImg2 from '../assets/web-banner-2.png';
 
@@ -33,8 +34,7 @@ export default function Hero() {
   const touchEndX = useRef(0);
 
   useEffect(() => {
-    fetch('/api/v1/banners')
-      .then((res) => res.json())
+    api.get('/banners')
       .then((res) => {
         if (res?.data && res.data.length > 0) {
           const apiSlides = res.data.map((b) => ({

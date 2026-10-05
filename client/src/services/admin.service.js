@@ -1,4 +1,4 @@
-import { api } from './api.js';
+import { api, API_BASE_URL } from './api.js';
 
 export const adminService = {
   // Dashboard & Metrics
@@ -129,7 +129,7 @@ export const adminService = {
     const formData = new FormData();
     formData.append('image', file);
     formData.append('folder', folder);
-    const response = await fetch('/api/v1/media/upload', {
+    const response = await fetch(`${API_BASE_URL}/media/upload`, {
       method: 'POST',
       body: formData,
       credentials: 'include',
@@ -148,7 +148,7 @@ export const adminService = {
       formData.append('images', f);
     }
     formData.append('folder', folder);
-    const response = await fetch('/api/v1/media/upload-multiple', {
+    const response = await fetch(`${API_BASE_URL}/media/upload-multiple`, {
       method: 'POST',
       body: formData,
       credentials: 'include',
