@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { 
   ShoppingBag, 
@@ -10,14 +11,21 @@ import {
   X,
   PhoneCall,
   Menu,
-  ShieldCheck
+  ShieldCheck,
+  ChevronRight,
+  LogIn,
+  LogOut,
+  User,
+  Sparkles
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import { productService } from '../services/product.service';
 import logoImg from '../assets/logo.png';
 
 export default function Header() {
   const { cartCount, setIsCartOpen, setCleaningModalProduct } = useCart();
+  const { user, logout, isAdmin } = useAuth() || {};
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -92,6 +100,30 @@ export default function Header() {
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
+
+  // Lock body scroll when mobile drawer is open
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isMobileMenuOpen]);
+
+  // Close search popover or mobile drawer on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setIsMobileMenuOpen(false);
+        setIsSearchOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handleSelectProduct = (product) => {
     setSearchQuery('');
@@ -323,77 +355,188 @@ export default function Header() {
         </div>
       </div>
 
-      {/* Mobile & Tablet Slide-Out Navigation Drawer */}
-      {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden bg-slate-900/60 backdrop-blur-xs flex">
-          <div className="w-4/5 max-w-xs bg-white h-full shadow-2xl p-5 flex flex-col justify-between animate-fadeInSlide">
-            
-            {/* Drawer Header */}
-            <div>
-              <div className="flex items-center justify-between pb-4 border-b border-slate-200">
-                <Link to="/" onClick={() => setIsMobileMenuOpen(false)}>
-                  <img src={logoImg} alt="V² Seafood" className="h-10 w-auto object-contain" />
-                </Link>
-                <button
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-1.5 rounded-[5px] text-slate-500 hover:bg-slate-100"
-                  aria-label="Close menu"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+      {/* Mobile & Tablet Slide-Out Navigation Drawer rendered directly into document.body via Portal */}
+      {isMobileMenuOpen && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] lg:hidden flex">
+          {/* Opaque Dark Backdrop with subtle blur */}
+          <div 
+            className="fixed inset-0 bg-slate-950/75 backdrop-blur-xs animate-fadeInOverlay"
+            onClick={() => setIsMobileMenuOpen(false)}
+            aria-hidden="true"
+          />
 
-              {/* Navigation Links List */}
-              <nav className="mt-4 space-y-1">
-                {navLinks.map((item) => {
-                  const isActive = location.pathname === item.path;
-                  const Icon = item.icon;
-                  return (
-                    <Link
-                      key={item.label}
-                      to={item.path}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className={`flex items-center justify-between p-3 rounded-[5px] text-sm font-bold transition ${
-                        isActive
-                          ? 'bg-ocean-900 text-white shadow-xs'
-                          : 'text-slate-800 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <Icon className={`w-4 h-4 ${isActive ? 'text-sea-400' : 'text-sea-600'}`} />
-                        <span>{item.label}</span>
-                      </div>
-                      {item.badge && (
-                        <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-[3px] bg-v2orange-500 text-white">
-                          {item.badge}
-                        </span>
-                      )}
-                    </Link>
-                  );
-                })}
-              </nav>
+          {/* Solid White Slide-Out Drawer Panel */}
+          <div 
+            className="relative w-[85%] max-w-[340px] bg-white h-[100dvh] shadow-2xl flex flex-col z-10 animate-slideRight overflow-hidden"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation Menu"
+          >
+            {/* 1. Drawer Header */}
+            <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100 bg-white flex-shrink-0">
+              <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center">
+                <img src={logoImg} alt="V² Seafood" className="h-9 w-auto object-contain" />
+              </Link>
+              <button
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="w-9 h-9 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition active:scale-95"
+                aria-label="Close menu"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            {/* Drawer Bottom Info */}
-            <div className="pt-4 border-t border-slate-200 space-y-3">
+            {/* 2. Scrollable Menu Body */}
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 no-scrollbar">
+              {/* User Account / Welcome Card */}
+              {user ? (
+                <div className="p-3 bg-gradient-to-r from-ocean-50/90 to-slate-50 border border-ocean-100 rounded-[5px] flex items-center justify-between">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-ocean-900 text-white font-bold text-xs flex items-center justify-center shadow-xs flex-shrink-0">
+                      {(user.name || user.email || 'U').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-slate-900 truncate">{user.name || 'Customer'}</div>
+                      <div className="text-[11px] text-slate-500 truncate">{user.email}</div>
+                    </div>
+                  </div>
+                  {isAdmin && (
+                    <Link
+                      to="/admin"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="px-2 py-1 text-[10px] font-bold uppercase rounded-[3px] bg-ocean-900 text-white hover:bg-ocean-800 transition shadow-xs flex-shrink-0"
+                    >
+                      Admin
+                    </Link>
+                  )}
+                </div>
+              ) : (
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-[5px] flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-slate-900">Welcome to V² Seafood</div>
+                    <div className="text-[10px] text-slate-500">Sign in for quick checkout & orders</div>
+                  </div>
+                  <Link
+                    to="/login"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="px-3 py-1.5 text-xs font-bold rounded-[4px] bg-ocean-900 text-white hover:bg-ocean-800 transition flex items-center gap-1.5 shadow-xs flex-shrink-0"
+                  >
+                    <LogIn className="w-3.5 h-3.5" />
+                    <span>Login</span>
+                  </Link>
+                </div>
+              )}
+
+              {/* Main Navigation Links */}
+              <div>
+                <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400 px-1 mb-1.5">
+                  Departments
+                </div>
+                <nav className="space-y-1">
+                  {navLinks.map((item) => {
+                    const isActive = location.pathname === item.path;
+                    const Icon = item.icon;
+                    return (
+                      <Link
+                        key={item.label}
+                        to={item.path}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className={`flex items-center justify-between px-3 py-2.5 rounded-[5px] text-sm font-semibold transition ${
+                          isActive
+                            ? 'bg-ocean-900 text-white shadow-xs font-bold'
+                            : 'text-slate-800 hover:bg-slate-100'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Icon className={`w-4 h-4 ${isActive ? 'text-sea-300' : 'text-sea-600'}`} />
+                          <span>{item.label}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {item.badge && (
+                            <span className="text-[10px] uppercase font-black px-1.5 py-0.5 rounded-[3px] bg-v2orange-500 text-white shadow-xs">
+                              {item.badge}
+                            </span>
+                          )}
+                          <ChevronRight className={`w-4 h-4 ${isActive ? 'text-slate-400' : 'text-slate-300'}`} />
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </nav>
+              </div>
+
+              {/* Quick Fresh Catch Categories */}
+              <div>
+                <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400 px-1 mb-1.5">
+                  Quick Catch Categories
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {[
+                    { name: 'Sea Fish (கடல் மீன்)', path: '/shop?category=sea-fish' },
+                    { name: 'Prawns (இறால்)', path: '/shop?category=prawns' },
+                    { name: 'Crab (நண்டு)', path: '/shop?category=crabs-squid' },
+                    { name: 'Seafood Meals', path: '/kitchen' },
+                  ].map((cat) => (
+                    <Link
+                      key={cat.name}
+                      to={cat.path}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="px-2.5 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200/90 rounded-[4px] text-xs font-medium text-slate-700 hover:text-ocean-900 truncate transition text-center"
+                    >
+                      {cat.name}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+
+              {/* Freshness & Trust Guarantee */}
+              <div className="p-3 rounded-[5px] bg-emerald-50 border border-emerald-200/80 space-y-1">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                  <span>100% Chemical & Formalin Free</span>
+                </div>
+                <div className="text-[11px] text-emerald-700 leading-tight">
+                  Sourced directly from Kasimedu Harbor at 4:30 AM & kept in cold chain at 0–4°C.
+                </div>
+              </div>
+
+              {/* Sign Out Button (if logged in) */}
+              {user && (
+                <button
+                  onClick={() => {
+                    if (logout) logout();
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-[5px] transition border border-rose-200"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Sign Out</span>
+                </button>
+              )}
+            </div>
+
+            {/* 3. Pinned Drawer Footer */}
+            <div className="p-3.5 border-t border-slate-200 bg-slate-50 space-y-2 flex-shrink-0">
               <a
                 href="tel:+919840012345"
-                className="flex items-center gap-2.5 p-3 rounded-[5px] bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 hover:bg-slate-100 transition"
+                className="flex items-center gap-2.5 p-2 rounded-[5px] bg-white border border-slate-200 hover:border-slate-300 text-slate-800 shadow-xs transition"
               >
-                <PhoneCall className="w-4 h-4 text-sea-600" />
-                <span>Helpline: +91 98400 12345</span>
+                <div className="w-7 h-7 rounded-full bg-sea-50 flex items-center justify-center text-sea-600 flex-shrink-0">
+                  <PhoneCall className="w-3.5 h-3.5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[10px] uppercase font-bold text-slate-400 leading-none">Customer Helpline</div>
+                  <div className="text-xs font-bold text-ocean-900 mt-0.5">+91 98400 12345</div>
+                </div>
               </a>
-              <div className="text-[11px] text-slate-500 flex items-center gap-1.5 px-1">
-                <Clock className="w-3.5 h-3.5 text-v2orange-500 flex-shrink-0" />
-                <span>Kasimedu Harbor 4:30 AM Catch</span>
+              <div className="text-[10px] text-slate-500 flex items-center gap-1.5 px-1">
+                <Clock className="w-3 h-3 text-v2orange-500 flex-shrink-0" />
+                <span>Next Delivery Slot: 60–90 Mins</span>
               </div>
             </div>
-
           </div>
-
-          {/* Clickable Backdrop Area to Close */}
-          <div className="flex-1" onClick={() => setIsMobileMenuOpen(false)} />
-        </div>
+        </div>,
+        document.body
       )}
     </header>
   );

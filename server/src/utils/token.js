@@ -15,11 +15,12 @@ export const getCookieOptions = () => {
   const expiresInStr = config.jwt.expiresIn.toString();
   const days = parseInt(expiresInStr, 10) || 7;
   const maxAge = days * 24 * 60 * 60 * 1000;
+  const isProd = config.nodeEnv === 'production';
 
   return {
     httpOnly: true,
-    secure: config.nodeEnv === 'production',
-    sameSite: 'lax',
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
     path: '/',
     maxAge
   };

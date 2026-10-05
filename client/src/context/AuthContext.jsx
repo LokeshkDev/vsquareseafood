@@ -24,12 +24,18 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     const data = await authService.login(email, password);
+    if (data?.token) {
+      localStorage.setItem('v2_token', data.token);
+    }
     setUser(data.user);
     return data;
   };
 
   const register = async (userData) => {
     const data = await authService.register(userData);
+    if (data?.token) {
+      localStorage.setItem('v2_token', data.token);
+    }
     setUser(data.user);
     return data;
   };
@@ -38,6 +44,8 @@ export const AuthProvider = ({ children }) => {
     try {
       await authService.logout();
     } finally {
+      localStorage.removeItem('v2_token');
+      localStorage.removeItem('token');
       setUser(null);
     }
   };
