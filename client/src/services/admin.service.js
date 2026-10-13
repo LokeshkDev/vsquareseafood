@@ -129,16 +129,8 @@ export const adminService = {
     const formData = new FormData();
     formData.append('image', file);
     formData.append('folder', folder);
-    const response = await fetch(`${API_BASE_URL}/media/upload`, {
-      method: 'POST',
-      body: formData,
-      credentials: 'include',
-    });
-    const resData = await response.json();
-    if (!response.ok) {
-      throw new Error(resData.message || 'Image upload failed');
-    }
-    return resData.data; // { url, r2Key, storage, filename, size, mimetype }
+    const res = await api.upload('/media/upload', formData);
+    return res.data; // { url, r2Key, storage, filename, size, mimetype }
   },
 
   // Upload multiple images simultaneously
@@ -148,14 +140,11 @@ export const adminService = {
       formData.append('images', f);
     }
     formData.append('folder', folder);
-    const response = await fetch(`${API_BASE_URL}/media/upload-multiple`, {
-      method: 'POST',
-      body: formData,
-      credentials: 'include',
-    });
-    const resData = await response.json();
-    if (!response.ok) {
-      // Fallback: Upload sequentially if multi-route had an issue
+    try {
+      const res = await api.upload('/media/upload-multiple', formData);
+      return res.data; // array of { url, r2Key, storage, ... }
+    } catch (err) {
+      // Fallback: Upload sequentially if multi-route had an issue (or if backend multi-limit reached)
       const results = [];
       for (const f of files) {
         const singleRes = await adminService.uploadImage(f, folder);
@@ -163,7 +152,6 @@ export const adminService = {
       }
       return results;
     }
-    return resData.data; // array of { url, r2Key, storage, ... }
   },
 
   // Delete uploaded media file from R2 or local disk

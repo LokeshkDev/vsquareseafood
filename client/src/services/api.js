@@ -17,8 +17,10 @@ class ApiClient {
 
     const token = typeof window !== 'undefined' ? (localStorage.getItem('v2_token') || localStorage.getItem('token')) : null;
 
+    const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+
     const headers = {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       ...options.headers,
     };
@@ -29,7 +31,7 @@ class ApiClient {
       credentials: 'include', // Automatically sends HTTP-only auth cookies
     };
 
-    if (config.body && typeof config.body === 'object') {
+    if (config.body && typeof config.body === 'object' && !isFormData) {
       config.body = JSON.stringify(config.body);
     }
 
@@ -87,6 +89,13 @@ class ApiClient {
 
   delete(endpoint) {
     return this.request(endpoint, { method: 'DELETE' });
+  }
+
+  upload(endpoint, formData) {
+    return this.request(endpoint, {
+      method: 'POST',
+      body: formData,
+    });
   }
 }
 

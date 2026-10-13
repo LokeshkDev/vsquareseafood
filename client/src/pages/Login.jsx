@@ -22,7 +22,13 @@ export default function Login() {
 
     try {
       const data = await login(email, password);
-      if (data.user.role === 'ADMIN' || data.user.role === 'SUPER_ADMIN') {
+      const token = data?.token || data?.data?.token;
+      if (token) {
+        localStorage.setItem('v2_token', token);
+        localStorage.setItem('token', token);
+      }
+      const currentUser = data?.user || data?.data?.user;
+      if (currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN') {
         navigate('/admin');
       } else {
         navigate(from, { replace: true });

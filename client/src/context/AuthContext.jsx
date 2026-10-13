@@ -10,6 +10,10 @@ export const AuthProvider = ({ children }) => {
   const fetchCurrentUser = async () => {
     try {
       const userData = await authService.getMe();
+      if (userData?.token) {
+        localStorage.setItem('v2_token', userData.token);
+        localStorage.setItem('token', userData.token);
+      }
       setUser(userData);
     } catch (err) {
       setUser(null);
@@ -24,19 +28,23 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     const data = await authService.login(email, password);
-    if (data?.token) {
-      localStorage.setItem('v2_token', data.token);
+    const token = data?.token || data?.data?.token;
+    if (token) {
+      localStorage.setItem('v2_token', token);
+      localStorage.setItem('token', token);
     }
-    setUser(data.user);
+    setUser(data?.user || data?.data?.user || data);
     return data;
   };
 
   const register = async (userData) => {
     const data = await authService.register(userData);
-    if (data?.token) {
-      localStorage.setItem('v2_token', data.token);
+    const token = data?.token || data?.data?.token;
+    if (token) {
+      localStorage.setItem('v2_token', token);
+      localStorage.setItem('token', token);
     }
-    setUser(data.user);
+    setUser(data?.user || data?.data?.user || data);
     return data;
   };
 

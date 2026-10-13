@@ -41,7 +41,8 @@ export const logout = async (req, res, next) => {
 export const getMe = async (req, res, next) => {
   try {
     const user = await authService.getMe(req.user.id);
-    return successResponse(res, user);
+    const token = req.cookies?.token || (req.headers.authorization && req.headers.authorization.startsWith('Bearer ') ? req.headers.authorization.split(' ')[1] : null);
+    return successResponse(res, { ...user, token: token || undefined });
   } catch (error) {
     next(error);
   }
