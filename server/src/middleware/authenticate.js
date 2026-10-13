@@ -66,3 +66,36 @@ export const authenticate = async (req, res, next) => {
     next(error);
   }
 };
+
+export const optionalAuthenticate = async (req, res, next) => {
+  try {
+    let token = req.cookies?.token;
+
+    if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
+
+    if (!token) {
+      return next();
+    }
+
+    try {
+      const decoded = verifyToken(token);
+      const userId = decoded?.id || decoded?.userId;
+      if (userId && typeof userId === 'string') {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+        });
+        if (user && user.isActive) {
+          req.user = user;
+        }
+      }
+    } catch (tokenErr) {
+      // Token expired or invalid - proceed as guest
+    }
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+};

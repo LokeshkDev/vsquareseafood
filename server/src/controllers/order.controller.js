@@ -3,13 +3,9 @@ import { successResponse, createdResponse, paginatedResponse } from '../utils/re
 
 export const createOrder = async (req, res, next) => {
   try {
-    const { addressId, customAddress, couponCode, notes } = req.body;
     const order = await orderService.createOrder({
-      userId: req.user.id,
-      addressId,
-      customAddress,
-      couponCode,
-      notes,
+      userId: req.user?.id || null,
+      ...req.body,
     });
     return createdResponse(res, order);
   } catch (error) {
@@ -30,8 +26,8 @@ export const getMyOrders = async (req, res, next) => {
 
 export const getOrderById = async (req, res, next) => {
   try {
-    const isAdmin = req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN';
-    const order = await orderService.getOrderById(req.params.id, req.user.id, isAdmin);
+    const isAdmin = req.user?.role === 'ADMIN' || req.user?.role === 'SUPER_ADMIN';
+    const order = await orderService.getOrderById(req.params.id, req.user?.id, isAdmin);
     return successResponse(res, order);
   } catch (error) {
     next(error);
@@ -54,7 +50,7 @@ export const getAllOrdersAdmin = async (req, res, next) => {
       status,
       search,
       page: Number(page) || 1,
-      limit: Number(limit) || 20,
+      limit: Number(limit) || 50,
     });
     return paginatedResponse(res, orders, pagination);
   } catch (error) {
@@ -67,6 +63,36 @@ export const updateOrderStatusAdmin = async (req, res, next) => {
     const { status } = req.body;
     const updated = await orderService.updateOrderStatus(req.params.id, status, req.user.id);
     return successResponse(res, updated);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateOrderAdmin = async (req, res, next) => {
+  try {
+    const updated = await orderService.updateOrderAdmin(req.params.id, req.body);
+    return successResponse(res, updated);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteOrderAdmin = async (req, res, next) => {
+  try {
+    const result = await orderService.deleteOrder(req.params.id);
+    return successResponse(res, result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createOrderAdmin = async (req, res, next) => {
+  try {
+    const order = await orderService.createOrder({
+      userId: req.body.userId || null,
+      ...req.body,
+    });
+    return createdResponse(res, order);
   } catch (error) {
     next(error);
   }

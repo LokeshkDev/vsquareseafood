@@ -83,8 +83,28 @@ export const adminService = {
     return api.get('/orders', params);
   },
 
+  getOrderById: async (id) => {
+    const res = await api.get(`/orders/${id}`);
+    return res.data;
+  },
+
   updateOrderStatus: async (id, status) => {
     const res = await api.patch(`/orders/${id}/status`, { status });
+    return res.data;
+  },
+
+  updateOrder: async (id, data) => {
+    const res = await api.put(`/orders/${id}`, data);
+    return res.data;
+  },
+
+  deleteOrder: async (id) => {
+    const res = await api.delete(`/orders/${id}`);
+    return res.data;
+  },
+
+  createOrder: async (orderData) => {
+    const res = await api.post('/orders/admin', orderData);
     return res.data;
   },
 
