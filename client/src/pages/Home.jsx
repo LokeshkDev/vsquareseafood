@@ -90,7 +90,8 @@ export default function Home() {
   // Sliced raw fish products for the main catalog section based on CMS limit
   const limit = Number(cmsSettings.catalogGridLimit) || 8;
   const rawProducts = allProducts.filter(p => (p.type || '').toLowerCase() === 'raw');
-  const freshFishProducts = rawProducts.slice(0, limit);
+  const featuredRaw = rawProducts.filter(p => Boolean(p.isFeatured));
+  const freshFishProducts = (featuredRaw.length > 0 ? featuredRaw : rawProducts).slice(0, limit);
 
   return (
     <div className="min-h-screen bg-slate-50">

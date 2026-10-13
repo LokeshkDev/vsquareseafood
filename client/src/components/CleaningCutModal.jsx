@@ -39,12 +39,16 @@ export default function CleaningCutModal() {
   // Determine allowed cuts specifically for this product
   const getAllowedCutIds = (prod) => {
     if (!prod) return [];
-    // 1. Explicit admin configured options on product
-    if (Array.isArray(prod.cleaningOptions) && prod.cleaningOptions.length > 0) {
+    // 1. Explicit cutAvailability map on product
+    if (prod.cutAvailability && typeof prod.cutAvailability === 'object') {
+      return Object.keys(prod.cutAvailability).filter((k) => prod.cutAvailability[k] === true);
+    }
+    // 2. Explicit admin configured options on product
+    if (Array.isArray(prod.cleaningOptions)) {
       return prod.cleaningOptions;
     }
-    // 2. Active variants on product with cleaning options
-    if (Array.isArray(prod.variants)) {
+    // 3. Active variants on product with cleaning options
+    if (Array.isArray(prod.variants) && prod.variants.length > 0) {
       const varCuts = prod.variants
         .filter((v) => v.cleaningOption && v.isAvailable !== false)
         .map((v) => v.cleaningOption);

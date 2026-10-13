@@ -2,32 +2,55 @@ import prisma from '../config/db.js';
 import { AppError } from '../utils/AppError.js';
 import { generateSlug, generateUniqueSlug } from '../utils/slug.js';
 
+export const ALL_CUT_IDS = [
+  'full-piece-uncut',
+  'curry-cut',
+  'fry-cut',
+  'whole-cleaned',
+  'fillet',
+  'prawns-peeled',
+  'prawns-whole',
+  'crab-cleaned',
+  'crab-whole',
+  'squid-rings',
+];
+
 export const enrichProductWithVariantsAndCuts = (product) => {
   if (!product) return product;
 
   let cleaningOptions = [];
   let cutPrices = {};
+  let cutAvailability = null;
+  let hasExplicitCutConfig = false;
 
   // 1. Try to read from seoDescription if stored as JSON
   if (product.seoDescription) {
     try {
       const parsed = JSON.parse(product.seoDescription);
-      if (Array.isArray(parsed.cleaningOptions) && parsed.cleaningOptions.length > 0) {
-        cleaningOptions = parsed.cleaningOptions;
-      }
-      if (parsed.cutPrices && typeof parsed.cutPrices === 'object') {
-        cutPrices = parsed.cutPrices;
+      if (parsed && typeof parsed === 'object') {
+        if (parsed.cutAvailability && typeof parsed.cutAvailability === 'object') {
+          cutAvailability = parsed.cutAvailability;
+          cleaningOptions = Object.keys(cutAvailability).filter((k) => cutAvailability[k] === true);
+          hasExplicitCutConfig = true;
+        } else if (Array.isArray(parsed.cleaningOptions)) {
+          cleaningOptions = parsed.cleaningOptions;
+          hasExplicitCutConfig = true;
+        }
+        if (parsed.cutPrices && typeof parsed.cutPrices === 'object') {
+          cutPrices = parsed.cutPrices;
+        }
       }
     } catch (e) {}
   }
 
-  // 2. If not in seoDescription, check variants
-  if (cleaningOptions.length === 0 && Array.isArray(product.variants)) {
+  // 2. If not explicitly configured in seoDescription, check variants
+  if (!hasExplicitCutConfig && Array.isArray(product.variants) && product.variants.length > 0) {
     const varCuts = product.variants
       .filter((v) => v.isAvailable && v.cleaningOption)
       .map((v) => v.cleaningOption);
     if (varCuts.length > 0) {
       cleaningOptions = [...new Set(varCuts)];
+      hasExplicitCutConfig = true;
     }
     product.variants.forEach((v) => {
       if (v.cleaningOption && v.isAvailable) {
@@ -36,8 +59,8 @@ export const enrichProductWithVariantsAndCuts = (product) => {
     });
   }
 
-  // 3. Fallback: Sensible category/name defaults for raw products if still empty
-  if (cleaningOptions.length === 0 && (product.type === 'RAW' || !product.type)) {
+  // 3. Fallback: Sensible category/name defaults for raw products ONLY if no explicit config exists
+  if (!hasExplicitCutConfig && cleaningOptions.length === 0 && (product.type === 'RAW' || !product.type)) {
     const catSlug = (
       (typeof product.category === 'object' ? product.category?.slug : product.category) ||
       product.categoryId ||
@@ -56,10 +79,26 @@ export const enrichProductWithVariantsAndCuts = (product) => {
     }
   }
 
+  // 4. Guarantee cutAvailability object with true/false booleans for all 10 cut options
+  if (!cutAvailability || typeof cutAvailability !== 'object') {
+    cutAvailability = {};
+    const enabledSet = new Set(cleaningOptions);
+    ALL_CUT_IDS.forEach((id) => {
+      cutAvailability[id] = enabledSet.has(id);
+    });
+  } else {
+    const normalizedAvailability = {};
+    ALL_CUT_IDS.forEach((id) => {
+      normalizedAvailability[id] = Boolean(cutAvailability[id]);
+    });
+    cutAvailability = normalizedAvailability;
+  }
+
   return {
     ...product,
     cleaningOptions,
     cutPrices,
+    cutAvailability,
   };
 };
 
@@ -219,6 +258,7 @@ export const createProduct = async (data) => {
     categoryId, 
     cutPrices, 
     cleaningOptions, 
+    cutAvailability,
     ...productData 
   } = data;
   const checkSlugExists = async (slug) => {
@@ -235,8 +275,30 @@ export const createProduct = async (data) => {
   if (targetCat) finalCategoryId = targetCat.id;
 
   return prisma.$transaction(async (tx) => {
-    if (cleaningOptions && Array.isArray(cleaningOptions) && cleaningOptions.length > 0) {
-      productData.seoDescription = JSON.stringify({ cleaningOptions, cutPrices: cutPrices || {} });
+    let finalCutAvailability = null;
+    let finalCleaningOptions = [];
+
+    if (cutAvailability && typeof cutAvailability === 'object') {
+      finalCutAvailability = {};
+      ALL_CUT_IDS.forEach((id) => {
+        finalCutAvailability[id] = Boolean(cutAvailability[id]);
+      });
+      finalCleaningOptions = ALL_CUT_IDS.filter((id) => finalCutAvailability[id]);
+    } else if (Array.isArray(cleaningOptions)) {
+      finalCutAvailability = {};
+      const enabledSet = new Set(cleaningOptions);
+      ALL_CUT_IDS.forEach((id) => {
+        finalCutAvailability[id] = enabledSet.has(id);
+      });
+      finalCleaningOptions = cleaningOptions;
+    }
+
+    if (finalCutAvailability !== null) {
+      productData.seoDescription = JSON.stringify({
+        cutAvailability: finalCutAvailability,
+        cleaningOptions: finalCleaningOptions,
+        cutPrices: cutPrices || {},
+      });
     }
 
     const product = await tx.product.create({
@@ -282,8 +344,8 @@ export const createProduct = async (data) => {
           },
         });
       }
-    } else if (cleaningOptions && Array.isArray(cleaningOptions) && cleaningOptions.length > 0) {
-      for (const cutId of cleaningOptions) {
+    } else if (finalCleaningOptions.length > 0) {
+      for (const cutId of finalCleaningOptions) {
         const price = cutPrices?.[cutId] !== undefined && cutPrices[cutId] !== ''
           ? Number(cutPrices[cutId])
           : Number(productData.basePrice);
@@ -358,6 +420,7 @@ export const updateProduct = async (id, data) => {
     variants,
     cutPrices,
     cleaningOptions,
+    cutAvailability,
     ...updateFields
   } = data;
 
@@ -450,16 +513,36 @@ export const updateProduct = async (id, data) => {
     }
   }
 
-  // Handle cleaningOptions and cutPrices sync
-  if (cleaningOptions !== undefined && Array.isArray(cleaningOptions)) {
-    updateFields.seoDescription = JSON.stringify({ cleaningOptions, cutPrices: cutPrices || {} });
+  // Handle cleaningOptions and cutAvailability and cutPrices sync
+  if (cutAvailability !== undefined || cleaningOptions !== undefined) {
+    let finalCutAvailability = {};
+    let finalCleaningOptions = [];
+
+    if (cutAvailability && typeof cutAvailability === 'object') {
+      ALL_CUT_IDS.forEach((cId) => {
+        finalCutAvailability[cId] = Boolean(cutAvailability[cId]);
+      });
+      finalCleaningOptions = ALL_CUT_IDS.filter((cId) => finalCutAvailability[cId]);
+    } else if (Array.isArray(cleaningOptions)) {
+      const enabledSet = new Set(cleaningOptions);
+      ALL_CUT_IDS.forEach((cId) => {
+        finalCutAvailability[cId] = enabledSet.has(cId);
+      });
+      finalCleaningOptions = cleaningOptions;
+    }
+
+    updateFields.seoDescription = JSON.stringify({
+      cutAvailability: finalCutAvailability,
+      cleaningOptions: finalCleaningOptions,
+      cutPrices: cutPrices || {},
+    });
 
     const targetBasePrice = updateFields.basePrice !== undefined ? Number(updateFields.basePrice) : Number(existing.basePrice);
     const existingVariants = existing.variants || [];
 
-    // Mark variants that are not selected in cleaningOptions as unavailable
+    // Mark variants that are not selected in finalCleaningOptions as unavailable
     for (const v of existingVariants) {
-      if (v.cleaningOption && !cleaningOptions.includes(v.cleaningOption)) {
+      if (v.cleaningOption && !finalCleaningOptions.includes(v.cleaningOption)) {
         await prisma.productVariant.update({
           where: { id: v.id },
           data: { isAvailable: false },
@@ -468,7 +551,7 @@ export const updateProduct = async (id, data) => {
     }
 
     // Upsert variant for each selected cleaning option
-    for (const cutId of cleaningOptions) {
+    for (const cutId of finalCleaningOptions) {
       const cutP = cutPrices?.[cutId] !== undefined && cutPrices[cutId] !== '' 
         ? Number(cutPrices[cutId]) 
         : targetBasePrice;
@@ -508,6 +591,39 @@ export const updateProduct = async (id, data) => {
             lowStockThreshold: 5,
           },
         });
+      }
+    }
+
+    // Ensure a standard fallback variant is available if all cleaning options are disabled
+    if (finalCleaningOptions.length === 0) {
+      const hasBaseVariant = existingVariants.some((v) => !v.cleaningOption && v.isAvailable);
+      if (!hasBaseVariant) {
+        const stdVariant = existingVariants.find((v) => !v.cleaningOption);
+        if (stdVariant) {
+          await prisma.productVariant.update({
+            where: { id: stdVariant.id },
+            data: { isAvailable: true, price: targetBasePrice },
+          });
+        } else {
+          const defaultSku = `${(existing.slug || 'SEAFOOD').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 14)}-STD`;
+          const createdV = await prisma.productVariant.create({
+            data: {
+              productId: id,
+              sku: defaultSku,
+              cutType: 'WHOLE',
+              price: targetBasePrice,
+              compareAtPrice: compareAtPrice ? Number(compareAtPrice) : null,
+              isAvailable: true,
+            },
+          });
+          await prisma.inventory.create({
+            data: {
+              productVariantId: createdV.id,
+              availableQuantity: Number(initialStock) || 30,
+              lowStockThreshold: 5,
+            },
+          });
+        }
       }
     }
   }

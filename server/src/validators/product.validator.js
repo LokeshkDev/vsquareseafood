@@ -35,10 +35,14 @@ export const createProductSchema = z.object({
     cookingTips: z.string().optional(),
     badge: z.string().optional(),
     imageUrl: z.string().optional(),
+    images: z.array(z.any()).optional(),
     isFreshCatch: z.boolean().default(false),
     isPopular: z.boolean().default(false),
     isFeatured: z.boolean().default(false),
     initialStock: z.number().int().nonnegative().optional().default(30),
+    cleaningOptions: z.array(z.string()).optional(),
+    cutAvailability: z.record(z.boolean()).optional(),
+    cutPrices: z.record(z.any()).optional(),
     seoTitle: z.string().optional(),
     seoDescription: z.string().optional(),
     variants: z.array(z.object({
@@ -51,7 +55,7 @@ export const createProductSchema = z.object({
       compareAtPrice: z.number().positive().optional(),
       initialStock: z.number().int().nonnegative().default(20),
     })).optional(),
-  }),
+  }).passthrough(),
 });
 
 export const updateProductSchema = z.object({
@@ -59,6 +63,7 @@ export const updateProductSchema = z.object({
     categoryId: z.string().optional(),
     name: z.string().min(2).optional(),
     localName: z.string().optional(),
+    slug: z.string().optional(),
     description: z.string().optional(),
     shortDescription: z.string().optional(),
     type: z.enum(['RAW', 'KITCHEN', 'READY_TO_COOK']).optional(),
@@ -72,11 +77,18 @@ export const updateProductSchema = z.object({
     cookingTips: z.string().optional(),
     badge: z.string().optional(),
     imageUrl: z.string().optional(),
+    images: z.array(z.any()).optional(),
     isFreshCatch: z.boolean().optional(),
     isPopular: z.boolean().optional(),
     isFeatured: z.boolean().optional(),
+    initialStock: z.number().int().nonnegative().optional(),
+    cleaningOptions: z.array(z.string()).optional(),
+    cutAvailability: z.record(z.boolean()).optional(),
+    cutPrices: z.record(z.any()).optional(),
     status: z.enum(['ACTIVE', 'INACTIVE', 'ARCHIVED']).optional(),
     seoTitle: z.string().optional(),
     seoDescription: z.string().optional(),
-  }),
+    variants: z.array(z.any()).optional(),
+  }).passthrough(),
 });
+

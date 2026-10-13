@@ -139,10 +139,13 @@ export default function ProductDetails() {
   // Helper to determine allowed cuts for this product
   const getAllowedCutIds = (prod) => {
     if (!prod) return [];
-    if (Array.isArray(prod.cleaningOptions) && prod.cleaningOptions.length > 0) {
+    if (prod.cutAvailability && typeof prod.cutAvailability === 'object') {
+      return Object.keys(prod.cutAvailability).filter((k) => prod.cutAvailability[k] === true);
+    }
+    if (Array.isArray(prod.cleaningOptions)) {
       return prod.cleaningOptions;
     }
-    if (Array.isArray(prod.variants)) {
+    if (Array.isArray(prod.variants) && prod.variants.length > 0) {
       const varCuts = prod.variants
         .filter((v) => v.cleaningOption && v.isAvailable !== false)
         .map((v) => v.cleaningOption);

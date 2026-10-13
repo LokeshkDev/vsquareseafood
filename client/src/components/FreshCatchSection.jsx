@@ -37,19 +37,24 @@ export default function FreshCatchSection({
     };
   }, [products]);
 
-  const freshCatchProducts = liveProducts
-    .filter((p) => {
-      const isRaw = (p.type || '').toLowerCase() === 'raw';
-      const isFresh = p.isFreshCatch || p.badge === "Today's Catch";
-      return isRaw && isFresh;
-    })
-    .slice(0, 4);
+  const explicitFresh = liveProducts.filter((p) => {
+    const isRaw = (p.type || '').toLowerCase() === 'raw';
+    return isRaw && Boolean(p.isFreshCatch);
+  });
+
+  // If products are explicitly checked as isFreshCatch, show strictly those.
+  // Otherwise fallback to badge "Today's Catch" so section is not blank initially.
+  const displayItems = explicitFresh.length > 0
+    ? explicitFresh
+    : liveProducts.filter((p) => (p.type || '').toLowerCase() === 'raw' && p.badge === "Today's Catch");
+
+  const freshCatchProducts = displayItems.slice(0, 8);
 
   if (freshCatchProducts.length === 0) {
     return null;
   }
 
-  const allFreshCount = liveProducts.filter((p) => (p.type || '').toLowerCase() === 'raw' && (p.isFreshCatch || p.badge === "Today's Catch")).length;
+  const allFreshCount = displayItems.length;
 
   return (
     <section className="py-6 sm:py-8 bg-slate-50 border-b border-slate-200">

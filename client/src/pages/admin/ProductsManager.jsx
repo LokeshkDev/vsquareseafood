@@ -194,9 +194,17 @@ export default function ProductsManager() {
         isFeatured: true,
         description: '',
         cookingTips: 'Delivered ready to eat in food-grade thermal containers. Consume hot.',
+        cutPrices: {},
+        cutAvailability: {},
+        cleaningOptions: [],
       });
     } else {
       const defaultCat = rawCategories[0]?.id || rawCategories[0]?.slug || 'sea-fish';
+      const initialCutAvailability = {};
+      CLEANING_OPTIONS.forEach((c) => {
+        initialCutAvailability[c.id] = ['full-piece-uncut', 'curry-cut', 'fry-cut', 'whole-cleaned'].includes(c.id);
+      });
+
       setFormData({
         name: '',
         localName: '',
@@ -220,6 +228,7 @@ export default function ProductsManager() {
         description: '',
         cookingTips: 'Marinate with red chili, turmeric, ginger-garlic paste and lemon. Shallow fry on iron tawa.',
         cutPrices: {},
+        cutAvailability: initialCutAvailability,
         cleaningOptions: ['full-piece-uncut', 'curry-cut', 'fry-cut', 'whole-cleaned'],
       });
     }
@@ -236,6 +245,21 @@ export default function ProductsManager() {
       : (p.imageUrl ? [p.imageUrl] : []);
     const primaryImg = p.images?.find((img) => img.isPrimary)?.publicUrl || rawImages[0] || p.imageUrl || '';
     const imagesList = rawImages.length > 0 ? rawImages : (primaryImg ? [primaryImg] : []);
+
+    const initialCutAvailability = {};
+    CLEANING_OPTIONS.forEach((cut) => {
+      if (p.cutAvailability && typeof p.cutAvailability[cut.id] === 'boolean') {
+        initialCutAvailability[cut.id] = p.cutAvailability[cut.id];
+      } else if (Array.isArray(p.cleaningOptions)) {
+        initialCutAvailability[cut.id] = p.cleaningOptions.includes(cut.id);
+      } else {
+        initialCutAvailability[cut.id] = isKit ? false : ['full-piece-uncut', 'curry-cut', 'fry-cut', 'whole-cleaned'].includes(cut.id);
+      }
+    });
+
+    const activeCleaningOptions = Object.keys(initialCutAvailability).filter(
+      (id) => initialCutAvailability[id]
+    );
 
     setFormData({
       name: p.name || '',
@@ -260,7 +284,8 @@ export default function ProductsManager() {
       description: p.description || '',
       cookingTips: p.cookingTips || '',
       cutPrices: p.cutPrices || {},
-      cleaningOptions: p.cleaningOptions || ['full-piece-uncut', 'curry-cut', 'fry-cut', 'whole-cleaned'],
+      cutAvailability: initialCutAvailability,
+      cleaningOptions: activeCleaningOptions,
     });
     setModalOpen(true);
   };
@@ -305,6 +330,25 @@ export default function ProductsManager() {
 
     try {
       const firstImage = formData.images?.[0] || formData.imageUrl?.trim() || undefined;
+      // Normalize cutPrices ensuring each selected cut has an exact numeric price
+      const normalizedCutPrices = {};
+      if (formData.cleaningOptions && Array.isArray(formData.cleaningOptions)) {
+        formData.cleaningOptions.forEach((cutId) => {
+          const userVal = formData.cutPrices?.[cutId];
+          if (userVal !== undefined && userVal !== '' && !isNaN(Number(userVal))) {
+            normalizedCutPrices[cutId] = Number(userVal);
+          } else {
+            const cutDef = CLEANING_OPTIONS.find((c) => c.id === cutId);
+            const basePriceNum = Number(formData.basePrice || 0);
+            normalizedCutPrices[cutId] = basePriceNum + (cutDef?.priceModifier || 0);
+          }
+        });
+      }
+
+      const cleanBadge = (!formData.isFreshCatch && formData.badge === "Today's Catch") 
+        ? '' 
+        : (formData.badge?.trim() || undefined);
+
       const payload = {
         name: formData.name.trim(),
         localName: formData.localName?.trim() || undefined,
@@ -320,15 +364,16 @@ export default function ProductsManager() {
         storageTemp: formData.storageTemp || undefined,
         imageUrl: firstImage,
         images: formData.images && formData.images.length > 0 ? formData.images : (firstImage ? [firstImage] : []),
-        badge: formData.badge?.trim() || undefined,
-        isFreshCatch: formData.isFreshCatch,
-        isPopular: formData.isPopular,
-        isFeatured: formData.isFeatured,
+        badge: cleanBadge,
+        isFreshCatch: Boolean(formData.isFreshCatch),
+        isPopular: Boolean(formData.isPopular),
+        isFeatured: Boolean(formData.isFeatured),
         initialStock: Number(formData.initialStock) || 30,
         description: formData.description?.trim() || undefined,
         cookingTips: formData.cookingTips?.trim() || undefined,
-        cutPrices: formData.cutPrices,
-        cleaningOptions: formData.cleaningOptions,
+        cutPrices: normalizedCutPrices,
+        cleaningOptions: formData.cleaningOptions || [],
+        cutAvailability: formData.cutAvailability || {},
       };
 
       if (editingProduct) {
@@ -1274,7 +1319,7 @@ export default function ProductsManager() {
                 {/* Seafood Cut & Cleaning Differential Pricing Section */}
                 {formDept === 'raw' && (
                   <div className="p-4 bg-slate-50 border border-slate-200 rounded-[5px] space-y-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
                       <div>
                         <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
                           Seafood Cut & Cleaning Differential Pricing Setup
@@ -1283,11 +1328,44 @@ export default function ProductsManager() {
                           Configure exact prices per cut preference (e.g. Full Piece: ₹649, Curry Cut: ₹699, Fry Cut: ₹719, Fillet: ₹789).
                         </p>
                       </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const allChecked = {};
+                            CLEANING_OPTIONS.forEach((c) => { allChecked[c.id] = true; });
+                            setFormData({
+                              ...formData,
+                              cutAvailability: allChecked,
+                              cleaningOptions: CLEANING_OPTIONS.map((c) => c.id),
+                            });
+                          }}
+                          className="text-[11px] font-bold text-ocean-700 hover:text-ocean-900 underline cursor-pointer"
+                        >
+                          Select All
+                        </button>
+                        <span className="text-slate-300">|</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const allUnchecked = {};
+                            CLEANING_OPTIONS.forEach((c) => { allUnchecked[c.id] = false; });
+                            setFormData({
+                              ...formData,
+                              cutAvailability: allUnchecked,
+                              cleaningOptions: [],
+                            });
+                          }}
+                          className="text-[11px] font-bold text-slate-500 hover:text-red-600 underline cursor-pointer"
+                        >
+                          Clear All (Uncheck All)
+                        </button>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                       {CLEANING_OPTIONS.map((cut) => {
-                        const isEnabled = formData.cleaningOptions?.includes(cut.id);
+                        const isEnabled = Boolean(formData.cutAvailability?.[cut.id]);
                         const basePriceNum = Number(formData.basePrice || 0);
                         const defaultCalcPrice = basePriceNum > 0 ? basePriceNum + (cut.priceModifier || 0) : '';
                         const cutPrice = formData.cutPrices?.[cut.id] !== undefined ? formData.cutPrices[cut.id] : defaultCalcPrice;
@@ -1302,13 +1380,21 @@ export default function ProductsManager() {
                             <div className="flex items-center gap-2 overflow-hidden">
                               <input
                                 type="checkbox"
-                                checked={Boolean(isEnabled)}
+                                checked={isEnabled}
                                 onChange={(e) => {
                                   const checked = e.target.checked;
-                                  const newOptions = checked
-                                    ? [...(formData.cleaningOptions || []), cut.id]
-                                    : (formData.cleaningOptions || []).filter((id) => id !== cut.id);
-                                  setFormData({ ...formData, cleaningOptions: newOptions });
+                                  const updatedAvailability = {
+                                    ...(formData.cutAvailability || {}),
+                                    [cut.id]: checked,
+                                  };
+                                  const updatedOptions = Object.keys(updatedAvailability).filter(
+                                    (id) => updatedAvailability[id]
+                                  );
+                                  setFormData({
+                                    ...formData,
+                                    cutAvailability: updatedAvailability,
+                                    cleaningOptions: updatedOptions,
+                                  });
                                 }}
                                 className="rounded text-ocean-600 focus:ring-ocean-500 cursor-pointer"
                               />
@@ -1415,37 +1501,51 @@ export default function ProductsManager() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-4 pt-1">
+                  <div className="flex flex-wrap gap-3 pt-1">
                     {formDept === 'raw' && (
-                      <label className="inline-flex items-center gap-2 cursor-pointer">
+                      <>
+                        <label className="inline-flex items-center gap-2 cursor-pointer bg-white px-3 py-2 rounded-[5px] border border-slate-200 hover:border-ocean-300 transition">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(formData.isFreshCatch)}
+                            onChange={(e) => setFormData({ ...formData, isFreshCatch: e.target.checked })}
+                            className="rounded text-ocean-600 focus:ring-ocean-500 cursor-pointer"
+                          />
+                          <span className="font-semibold text-slate-800 text-xs">Today's Fresh Catch (Homepage Section)</span>
+                        </label>
+
+                        <label className="inline-flex items-center gap-2 cursor-pointer bg-white px-3 py-2 rounded-[5px] border border-slate-200 hover:border-ocean-300 transition">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(formData.isFeatured)}
+                            onChange={(e) => setFormData({ ...formData, isFeatured: e.target.checked })}
+                            className="rounded text-ocean-600 focus:ring-ocean-500 cursor-pointer"
+                          />
+                          <span className="font-semibold text-slate-800 text-xs">Fresh Seafood Catalog (Homepage Grid)</span>
+                        </label>
+                      </>
+                    )}
+
+                    {formDept === 'kitchen' && (
+                      <label className="inline-flex items-center gap-2 cursor-pointer bg-white px-3 py-2 rounded-[5px] border border-slate-200 hover:border-ocean-300 transition">
                         <input
                           type="checkbox"
-                          checked={formData.isFreshCatch}
-                          onChange={(e) => setFormData({ ...formData, isFreshCatch: e.target.checked })}
-                          className="rounded text-ocean-600 focus:ring-ocean-500"
+                          checked={Boolean(formData.isFeatured)}
+                          onChange={(e) => setFormData({ ...formData, isFeatured: e.target.checked })}
+                          className="rounded text-ocean-600 focus:ring-ocean-500 cursor-pointer"
                         />
-                        <span className="font-semibold text-slate-700">Display in "Fresh Catch" Section</span>
+                        <span className="font-semibold text-slate-800 text-xs">Feature on Homepage</span>
                       </label>
                     )}
 
-                    <label className="inline-flex items-center gap-2 cursor-pointer">
+                    <label className="inline-flex items-center gap-2 cursor-pointer bg-white px-3 py-2 rounded-[5px] border border-slate-200 hover:border-ocean-300 transition">
                       <input
                         type="checkbox"
-                        checked={formData.isPopular}
+                        checked={Boolean(formData.isPopular)}
                         onChange={(e) => setFormData({ ...formData, isPopular: e.target.checked })}
-                        className="rounded text-ocean-600 focus:ring-ocean-500"
+                        className="rounded text-ocean-600 focus:ring-ocean-500 cursor-pointer"
                       />
-                      <span className="font-semibold text-slate-700">Mark as Popular / Bestseller</span>
-                    </label>
-
-                    <label className="inline-flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.isFeatured}
-                        onChange={(e) => setFormData({ ...formData, isFeatured: e.target.checked })}
-                        className="rounded text-ocean-600 focus:ring-ocean-500"
-                      />
-                      <span className="font-semibold text-slate-700">Feature on Homepage</span>
+                      <span className="font-semibold text-slate-800 text-xs">Mark as Popular / Bestseller</span>
                     </label>
                   </div>
                 </div>
