@@ -8,6 +8,16 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   const fetchCurrentUser = async () => {
+    const token = typeof window !== 'undefined'
+      ? (localStorage.getItem('v2_token') || localStorage.getItem('token'))
+      : null;
+
+    if (!token) {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
     try {
       const userData = await authService.getMe();
       if (userData?.token) {
@@ -17,6 +27,8 @@ export const AuthProvider = ({ children }) => {
       setUser(userData);
     } catch (err) {
       setUser(null);
+      localStorage.removeItem('v2_token');
+      localStorage.removeItem('token');
     } finally {
       setLoading(false);
     }

@@ -15,14 +15,6 @@ import { PRODUCTS, CLEANING_OPTIONS } from '../data/products';
 import { productService } from '../services/product.service';
 import { api } from '../services/api';
 
-const DEFAULT_RAW_CATEGORIES = [
-  { id: 'all', name: 'All Fresh Seafood' },
-  { id: 'sea-fish', name: 'Sea Fish (கடல் மீன்)' },
-  { id: 'prawns', name: 'Prawns (இறால்)' },
-  { id: 'crabs-squid', name: 'Crab & Squid (நண்டு & கணவா)' },
-  { id: 'freshwater', name: 'River Fish (ஆற்று மீன்)' },
-];
-
 export default function Shop() {
   const [searchParams, setSearchParams] = useSearchParams();
   const urlCategory = searchParams.get('category') || 'all';
@@ -31,7 +23,7 @@ export default function Shop() {
 
   const [productsList, setProductsList] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [rawCategories, setRawCategories] = useState(DEFAULT_RAW_CATEGORIES);
+  const [rawCategories, setRawCategories] = useState([{ id: 'all', name: 'All Fresh Seafood' }]);
   const [selectedCategory, setSelectedCategory] = useState(urlCategory);
   const [searchQuery, setSearchQuery] = useState(urlQuery);
   const [sortBy, setSortBy] = useState('popular');
@@ -395,7 +387,21 @@ export default function Shop() {
             )}
 
             {/* Product Grid */}
-            {filteredProducts.length === 0 ? (
+            {loading ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                  <div key={n} className="bg-white rounded-[5px] border border-slate-200 overflow-hidden p-3 space-y-3 animate-pulse">
+                    <div className="aspect-[4/3] bg-slate-100 rounded-[3px]" />
+                    <div className="h-4 bg-slate-200 rounded w-3/4" />
+                    <div className="h-3 bg-slate-100 rounded w-1/2" />
+                    <div className="flex items-center justify-between pt-2">
+                      <div className="h-4 bg-slate-200 rounded w-1/3" />
+                      <div className="h-8 bg-slate-200 rounded w-1/3" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : filteredProducts.length === 0 ? (
               <div className="bg-white border border-slate-200 rounded-[5px] p-12 text-center space-y-3">
                 <div className="text-slate-400 text-4xl">🐟</div>
                 <h3 className="text-base font-bold text-slate-800">No matching seafood found</h3>

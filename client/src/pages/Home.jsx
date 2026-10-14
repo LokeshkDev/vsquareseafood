@@ -44,6 +44,7 @@ const DEFAULT_CMS_SETTINGS = {
 
 export default function Home() {
   const [allProducts, setAllProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [cmsSettings, setCmsSettings] = useState(() => {
     const saved = localStorage.getItem('v2_cms_sections');
     if (saved) {
@@ -62,6 +63,9 @@ export default function Home() {
       })
       .catch((err) => {
         console.error('Failed to load products in Home:', err);
+      })
+      .finally(() => {
+        setLoading(false);
       });
   };
 
@@ -159,7 +163,21 @@ export default function Home() {
             </div>
 
             {/* 4-col desktop, 3-col tablet, 2-col mobile grid */}
-            {freshFishProducts.length > 0 ? (
+            {loading && freshFishProducts.length === 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                {[1, 2, 3, 4].map((n) => (
+                  <div key={n} className="bg-white rounded-[5px] border border-slate-200 overflow-hidden p-3 space-y-3 animate-pulse">
+                    <div className="aspect-[4/3] bg-slate-100 rounded-[3px]" />
+                    <div className="h-4 bg-slate-200 rounded w-3/4" />
+                    <div className="h-3 bg-slate-100 rounded w-1/2" />
+                    <div className="flex items-center justify-between pt-2">
+                      <div className="h-4 bg-slate-200 rounded w-1/3" />
+                      <div className="h-8 bg-slate-200 rounded w-1/3" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : freshFishProducts.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                 {freshFishProducts.map((product) => (
                   <ProductCard key={product.id} product={product} />

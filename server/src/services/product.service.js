@@ -94,8 +94,14 @@ export const enrichProductWithVariantsAndCuts = (product) => {
     cutAvailability = normalizedAvailability;
   }
 
+  const primaryImage = Array.isArray(product.images)
+    ? (product.images.find((img) => img.isPrimary) || product.images[0])
+    : null;
+  const image = primaryImage?.publicUrl || product.image || null;
+
   return {
     ...product,
+    image,
     cleaningOptions,
     cutPrices,
     cutAvailability,

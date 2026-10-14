@@ -21,6 +21,7 @@ import {
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { productService } from '../services/product.service';
+import { api } from '../services/api';
 import logoImg from '../assets/logo.png';
 
 export default function Header() {
@@ -32,8 +33,10 @@ export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [catalogProducts, setCatalogProducts] = useState([]);
+  const [quickCategories, setQuickCategories] = useState([]);
   const searchContainerRef = useRef(null);
   const searchInputRef = useRef(null);
+  const hasLoadedCatalogRef = useRef(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -50,22 +53,60 @@ export default function Header() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Fetch live products for search autocomplete and listen to updates
+  // Fetch dynamic categories from database for quick links
   useEffect(() => {
-    const fetchCatalog = () => {
+    api.get('/categories')
+      .then((res) => {
+        const list = res?.data || res || [];
+        if (Array.isArray(list)) {
+          const activeOnly = list.filter(c => c.isActive !== false).slice(0, 4);
+          setQuickCategories(activeOnly.map(c => {
+            const isKitchen = c.department === 'kitchen' || (c.slug || '').startsWith('kitchen-');
+            return {
+              name: c.tamilName ? `${c.name} (${c.tamilName})` : c.name,
+              path: isKitchen ? `/kitchen?category=${c.slug || c.id}` : `/shop?category=${c.slug || c.id}`
+            };
+          }));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Defer catalog products loading until search is actually opened or typed into
+  const ensureCatalogLoaded = () => {
+    if (!hasLoadedCatalogRef.current) {
+      hasLoadedCatalogRef.current = true;
       productService.getProducts({ limit: 100 })
         .then(res => {
           const items = res?.data || res?.products || res || [];
           if (Array.isArray(items)) setCatalogProducts(items);
         })
         .catch(() => {});
+    }
+  };
+
+  useEffect(() => {
+    if (isSearchOpen || searchQuery) {
+      ensureCatalogLoaded();
+    }
+  }, [isSearchOpen, searchQuery]);
+
+  useEffect(() => {
+    const handleCmsUpdate = () => {
+      if (hasLoadedCatalogRef.current) {
+        productService.getProducts({ limit: 100 })
+          .then(res => {
+            const items = res?.data || res?.products || res || [];
+            if (Array.isArray(items)) setCatalogProducts(items);
+          })
+          .catch(() => {});
+      }
     };
-    fetchCatalog();
-    window.addEventListener('storage', fetchCatalog);
-    window.addEventListener('v2_cms_updated', fetchCatalog);
+    window.addEventListener('storage', handleCmsUpdate);
+    window.addEventListener('v2_cms_updated', handleCmsUpdate);
     return () => {
-      window.removeEventListener('storage', fetchCatalog);
-      window.removeEventListener('v2_cms_updated', fetchCatalog);
+      window.removeEventListener('storage', handleCmsUpdate);
+      window.removeEventListener('v2_cms_updated', handleCmsUpdate);
     };
   }, []);
 
@@ -388,45 +429,6 @@ export default function Header() {
 
             {/* 2. Scrollable Menu Body */}
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 no-scrollbar">
-              {/* User Account / Welcome Card */}
-              {user ? (
-                <div className="p-3 bg-gradient-to-r from-ocean-50/90 to-slate-50 border border-ocean-100 rounded-[5px] flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-9 h-9 rounded-full bg-ocean-900 text-white font-bold text-xs flex items-center justify-center shadow-xs flex-shrink-0">
-                      {(user.name || user.email || 'U').charAt(0).toUpperCase()}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-xs font-bold text-slate-900 truncate">{user.name || 'Customer'}</div>
-                      <div className="text-[11px] text-slate-500 truncate">{user.email}</div>
-                    </div>
-                  </div>
-                  {isAdmin && (
-                    <Link
-                      to="/admin"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="px-2 py-1 text-[10px] font-bold uppercase rounded-[3px] bg-ocean-900 text-white hover:bg-ocean-800 transition shadow-xs flex-shrink-0"
-                    >
-                      Admin
-                    </Link>
-                  )}
-                </div>
-              ) : (
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-[5px] flex items-center justify-between">
-                  <div>
-                    <div className="text-xs font-bold text-slate-900">Welcome to V² Seafood</div>
-                    <div className="text-[10px] text-slate-500">Sign in for quick checkout & orders</div>
-                  </div>
-                  <Link
-                    to="/login"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="px-3 py-1.5 text-xs font-bold rounded-[4px] bg-ocean-900 text-white hover:bg-ocean-800 transition flex items-center gap-1.5 shadow-xs flex-shrink-0"
-                  >
-                    <LogIn className="w-3.5 h-3.5" />
-                    <span>Login</span>
-                  </Link>
-                </div>
-              )}
-
               {/* Main Navigation Links */}
               <div>
                 <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400 px-1 mb-1.5">
@@ -465,53 +467,25 @@ export default function Header() {
                 </nav>
               </div>
 
-              {/* Quick Fresh Catch Categories */}
-              <div>
-                <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400 px-1 mb-1.5">
-                  Quick Catch Categories
+              {/* Quick Fresh Catch Categories (Dynamic from DB) */}
+              {quickCategories.length > 0 && (
+                <div>
+                  <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400 px-1 mb-1.5">
+                    Quick Catch Categories
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {quickCategories.map((cat) => (
+                      <Link
+                        key={cat.name}
+                        to={cat.path}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="px-2.5 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200/90 rounded-[4px] text-xs font-medium text-slate-700 hover:text-ocean-900 truncate transition text-center"
+                      >
+                        {cat.name}
+                      </Link>
+                    ))}
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {[
-                    { name: 'Sea Fish (கடல் மீன்)', path: '/shop?category=sea-fish' },
-                    { name: 'Prawns (இறால்)', path: '/shop?category=prawns' },
-                    { name: 'Crab (நண்டு)', path: '/shop?category=crabs-squid' },
-                    { name: 'Seafood Meals', path: '/kitchen' },
-                  ].map((cat) => (
-                    <Link
-                      key={cat.name}
-                      to={cat.path}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="px-2.5 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200/90 rounded-[4px] text-xs font-medium text-slate-700 hover:text-ocean-900 truncate transition text-center"
-                    >
-                      {cat.name}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-
-              {/* Freshness & Trust Guarantee */}
-              <div className="p-3 rounded-[5px] bg-emerald-50 border border-emerald-200/80 space-y-1">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                  <span>100% Chemical & Formalin Free</span>
-                </div>
-                <div className="text-[11px] text-emerald-700 leading-tight">
-                  Sourced directly from Kasimedu Harbor at 4:30 AM & kept in cold chain at 0–4°C.
-                </div>
-              </div>
-
-              {/* Sign Out Button (if logged in) */}
-              {user && (
-                <button
-                  onClick={() => {
-                    if (logout) logout();
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-[5px] transition border border-rose-200"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>Sign Out</span>
-                </button>
               )}
             </div>
 

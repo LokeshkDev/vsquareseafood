@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
@@ -8,25 +8,30 @@ import StickyMobileCartBar from './components/StickyMobileCartBar';
 import CartDrawer from './components/CartDrawer';
 import CleaningCutModal from './components/CleaningCutModal';
 import LocationModal from './components/LocationModal';
+import PageSkeleton from './components/PageSkeleton';
 import { ProtectedRoute } from './routes/ProtectedRoute';
 
-// Pages
+// Eagerly loaded primary landing page for instant FCP / LCP
 import Home from './pages/Home';
-import Shop from './pages/Shop';
-import ProductDetails from './pages/ProductDetails';
-import CloudKitchen from './pages/CloudKitchen';
-import Catering from './pages/Catering';
-import Cart from './pages/Cart';
-import Checkout from './pages/Checkout';
-import Login from './pages/Login';
-import AdminLayout from './pages/admin/AdminLayout';
-import AdminDashboard from './pages/admin/Dashboard';
-import ProductsManager from './pages/admin/ProductsManager';
-import CategoriesManager from './pages/admin/CategoriesManager';
-import InventoryManager from './pages/admin/InventoryManager';
-import OrdersManager from './pages/admin/OrdersManager';
-import CMSManager from './pages/admin/CMSManager';
-import CustomersManager from './pages/admin/CustomersManager';
+
+// Lazy-loaded code-split pages for high-speed initial bundle & run time
+const Shop = lazy(() => import('./pages/Shop'));
+const ProductDetails = lazy(() => import('./pages/ProductDetails'));
+const CloudKitchen = lazy(() => import('./pages/CloudKitchen'));
+const Catering = lazy(() => import('./pages/Catering'));
+const Cart = lazy(() => import('./pages/Cart'));
+const Checkout = lazy(() => import('./pages/Checkout'));
+const Login = lazy(() => import('./pages/Login'));
+
+// Lazy-loaded admin suite (loaded strictly on-demand)
+const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
+const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'));
+const ProductsManager = lazy(() => import('./pages/admin/ProductsManager'));
+const CategoriesManager = lazy(() => import('./pages/admin/CategoriesManager'));
+const InventoryManager = lazy(() => import('./pages/admin/InventoryManager'));
+const OrdersManager = lazy(() => import('./pages/admin/OrdersManager'));
+const CMSManager = lazy(() => import('./pages/admin/CMSManager'));
+const CustomersManager = lazy(() => import('./pages/admin/CustomersManager'));
 
 // Auto scroll to top on route change
 function ScrollToTop() {
@@ -46,34 +51,36 @@ function MainLayout() {
     <div className="flex flex-col min-h-screen">
       {!isAdminRoute && !isAuthRoute && <Header />}
       <main className="flex-1">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/shop" element={<Shop />} />
-          <Route path="/product/:slug" element={<ProductDetails />} />
-          <Route path="/kitchen" element={<CloudKitchen />} />
-          <Route path="/catering" element={<Catering />} />
-          <Route path="/cart" element={<Cart />} />
-          <Route path="/checkout" element={<Checkout />} />
-          <Route path="/login" element={<Login />} />
+        <Suspense fallback={<PageSkeleton />}>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/shop" element={<Shop />} />
+            <Route path="/product/:slug" element={<ProductDetails />} />
+            <Route path="/kitchen" element={<CloudKitchen />} />
+            <Route path="/catering" element={<Catering />} />
+            <Route path="/cart" element={<Cart />} />
+            <Route path="/checkout" element={<Checkout />} />
+            <Route path="/login" element={<Login />} />
 
-          {/* Admin Protected Routes */}
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute requireAdmin>
-                <AdminLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<AdminDashboard />} />
-            <Route path="products" element={<ProductsManager />} />
-            <Route path="categories" element={<CategoriesManager />} />
-            <Route path="inventory" element={<InventoryManager />} />
-            <Route path="orders" element={<OrdersManager />} />
-            <Route path="cms" element={<CMSManager />} />
-            <Route path="customers" element={<CustomersManager />} />
-          </Route>
-        </Routes>
+            {/* Admin Protected Routes */}
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<AdminDashboard />} />
+              <Route path="products" element={<ProductsManager />} />
+              <Route path="categories" element={<CategoriesManager />} />
+              <Route path="inventory" element={<InventoryManager />} />
+              <Route path="orders" element={<OrdersManager />} />
+              <Route path="cms" element={<CMSManager />} />
+              <Route path="customers" element={<CustomersManager />} />
+            </Route>
+          </Routes>
+        </Suspense>
       </main>
       {!isAdminRoute && !isAuthRoute && <Footer />}
 
@@ -102,4 +109,3 @@ export default function App() {
     </Router>
   );
 }
-
